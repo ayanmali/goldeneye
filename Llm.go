@@ -20,20 +20,20 @@ type LLM struct {
 
 type LLMRequest struct {
 	Model     string `json:"model"`
-	MaxTokens int    `json:"max_tokens"`
-	Tools     []Tool `json:"tools"`
+	MaxTokens int    `json:"max_tokens,omitempty"`
+	Tools     []Tool `json:"tools,omitempty"`
 	/*
 		Specify how the LLM should use the given tools. 'any' forces a tool to be used, 'tool' forces a specific tool to be used, and 'auto' does not enforce any tool usage.
 		Follows schema: {"type" : "auto/any/tool"} --- If "type" is set to "tool", then you must include another key "name", which is the name of the tool to force the LLM to use.
 		Parallel tool use can be disabled by adding `"disable_parallel_tool_use" = true`.
 	*/
-	ToolChoice map[string]string `json:"tool_choice"`
+	ToolChoice map[string]string `json:"tool_choice,omitempty"`
 	/*
 		Defines the conversation history with the LLM
 	*/
 	Messages    []Message `json:"messages"`
-	System      string    `json:"system"`
-	Temperature float32   `json:"temperature"`
+	System      string    `json:"system,omitempty"`
+	Temperature float32   `json:"temperature,omitempty"`
 }
 
 // Defines the structure of a single message (i.e. either system or user prompt)
@@ -64,7 +64,7 @@ type Message struct {
 		        }
 			]
 	*/
-	Content interface{} `json:"content"` // prompt
+	Content any `json:"content"` // prompt
 }
 
 // type Source struct {
@@ -82,21 +82,21 @@ type Content struct {
 		The type can be 'text', 'tool_use' (used when providing a Tool to the LLM for it to use), or 'tool_result' (used when passing the output of a Tool call back to the LLM)
 	*/
 	Type  string            `json:"type"`
-	Text  string            `json:"text"` // LLM response itself
-	ID    string            `json:"id"`
-	Name  string            `json:"name"`
-	Input map[string]string `json:"input"`
+	Text  string            `json:"text,omitempty"` // LLM response itself
+	ID    string            `json:"id,omitempty"`
+	Name  string            `json:"name,omitempty"`
+	Input map[string]string `json:"input,omitempty"`
 	/*
 		The ID from the initial tool use call to the LLM.
 		This ID is generated in the response after making an initial LLM call with tool use enabled.
 		Use this key with 'role' = 'user' when passing the result from a tool call back to the LLM. Be sure to also include the 'content' key
 	*/
-	ToolUseID string `json:"tool_use_id"`
+	ToolUseID string `json:"tool_use_id,omitempty"`
 	/*
 		The output from the tool call.
 		Use this key when passing the result from the tool call back to the LLM
 	*/
-	Content string `json:"content"`
+	Content string `json:"content,omitempty"`
 }
 
 // type ResponseMessage struct {
@@ -111,12 +111,12 @@ type LLMResponse struct {
 	*/
 	Content []Content `json:"content"`
 	ID      string    `json:"id"`
-	Model   string    `json:"model"`
-	Role    string    `json:"role"`
+	Model   string    `json:"model,omitempty"`
+	Role    string    `json:"role,omitempty"`
 	//Type         string          `json:"type"`
-	StopReason   string         `json:"stop_reason"`
-	StopSequence any            `json:"stop_sequence"`
-	Usage        map[string]int `json:"usage"`
+	StopReason   string         `json:"stop_reason,omitempty"`
+	StopSequence any            `json:"stop_sequence,omitempty"`
+	Usage        map[string]int `json:"usage,omitempty"`
 	//Message      ResponseMessage `json:"message"`
 }
 
@@ -151,11 +151,11 @@ func (llm LLM) NewLLMRequest(tools []Tool, maxTokens int, system string, tempera
 /*
 Create a request that takes in a user prompt
 */
-func (llm LLM) NewPromptRequest(tools []Tool, model string, maxTokens int, system string, temperature float32, prompt string) *LLMRequest {
+func (llm LLM) NewPromptRequest(maxTokens int, system string, temperature float32, prompt string) *LLMRequest {
 	return &LLMRequest{
 		Model:     llm.Model,
 		MaxTokens: maxTokens,
-		Tools:     tools,
+		//Tools:     tools,
 		Messages: []Message{
 			{Role: "user", Content: prompt},
 		},
@@ -167,7 +167,7 @@ func (llm LLM) NewPromptRequest(tools []Tool, model string, maxTokens int, syste
 /*
 Create a request that involves a user prompt as well as a partially filled response
 */
-func (llm LLM) NewPromptRequestWithResponseStarter(tools []Tool, model string, maxTokens int, system string, temperature float32, prompt string, responseStarter string) *LLMRequest {
+func (llm LLM) NewPromptRequestWithResponseStarter(tools []Tool, maxTokens int, system string, temperature float32, prompt string, responseStarter string) *LLMRequest {
 	return &LLMRequest{
 		Model:     llm.Model,
 		MaxTokens: maxTokens,
@@ -194,7 +194,7 @@ func (llm LLM) call(reqData LLMRequest) (*LLMResponse, int, error) {
 
 	// Creating the request
 	url := "https://api.anthropic.com/v1/messages"
-	req, err := http.NewRequest("GET", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 
 	if err != nil {
 		fmt.Printf("Error creating request:%v\n", err)
@@ -202,9 +202,12 @@ func (llm LLM) call(reqData LLMRequest) (*LLMResponse, int, error) {
 	}
 
 	// Setting request headers
-	req.Header.Set("x-api-key:", llm.ApiKey)
-	req.Header.Set("anthropic-version:", "2024-10-22")
-	req.Header.Set("content-type:", "application/json")
+	fmt.Println("Setting request headers")
+	req.Header.Set("x-api-key", llm.ApiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("content-type", "application/json")
+
+	fmt.Println("Making request")
 
 	// Sending the response
 	client := &http.Client{}
@@ -217,6 +220,7 @@ func (llm LLM) call(reqData LLMRequest) (*LLMResponse, int, error) {
 	// Closing the response body once the function is finished executing
 	defer res.Body.Close()
 
+	fmt.Println("Reading response data")
 	// Reading the response data
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -228,6 +232,7 @@ func (llm LLM) call(reqData LLMRequest) (*LLMResponse, int, error) {
 		fmt.Printf("Request failed with status code %d: %s\n", res.StatusCode, string(resBody))
 	}
 
+	fmt.Println("Storing response")
 	// Storing the response into the Response struct
 	var apiRes LLMResponse
 	err = json.Unmarshal(resBody, &apiRes)
@@ -323,10 +328,10 @@ type Tool struct {
 	/*
 		Defines the function to be executed for the model's tool calls
 	*/
-	Function func(...interface{}) interface{}
+	Function func(...any) any `json:"-"`
 }
 
-func (llm LLM) getToolOutput(response LLMResponse, tools []Tool) {
+func (llm LLM) getToolOutput(response LLMResponse, tools []Tool) any {
 	respContent := response.Content
 
 	// Creating a map containing every tool's name for efficient lookup
@@ -339,20 +344,21 @@ func (llm LLM) getToolOutput(response LLMResponse, tools []Tool) {
 		if respContent[j].Type == "tool_use" {
 			tool, ok := toolMap[respContent[j].Name]
 			if !ok {
-				return
+				return nil
 			}
 			// Map that represents the name of each input parameter and the value to pass in for that parameter for this function call
 			funcParams := respContent[j].Input
 
 			// Creating a slice of function parameter values from the given input parameters map
-			values := make([]interface{}, 0, len(funcParams))
+			values := make([]any, 0, len(funcParams))
 			for _, value := range funcParams {
 				values = append(values, value)
 			}
-			tool.Function(values...)
+			return tool.Function(values...)
 
 		}
 	}
+	return nil
 }
 
 /*

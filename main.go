@@ -19,16 +19,7 @@ import (
 TODO:
 Add logic for redefining a function in the variadic parameter format
 */
-func getWeather(args ...any) any {
-	if len(args) == 0 {
-		return "Error: No location provided"
-	}
-
-	location, ok := args[0].(string)
-	if !ok {
-		return "Error: Invalid location type"
-	}
-
+func getWeather(location string) float32 {
 	switch location {
 	case "San Francisco, CA":
 		return float32(24.0)
@@ -41,11 +32,26 @@ func getWeather(args ...any) any {
 	}
 }
 
+func getWeatherVariadic(args ...any) any {
+	if len(args) == 0 {
+		return "Error: No location provided"
+	}
+
+	location, ok := args[0].(string)
+	if !ok {
+		return "Error: Invalid location type"
+	}
+
+	return getWeather(location)
+}
+
 func main() {
 	hasSystemPrompt := false
 	hasMemory := true
+
+	// Replace w actual values
 	systemPrompt := ""
-	memoryBlockString := ""
+	memoryBlock := MemoryBlock{}
 
 	llm := LLM{
 		ApiKey: ANTHROPIC_API_KEY,
@@ -73,9 +79,47 @@ func main() {
 					},
 					Required: []string{"location"},
 				},
-				Function: getWeather,
+				Function: getWeatherVariadic,
 			},
 		},
+	}
+
+	if hasSystemPrompt {
+		llm.System = append(llm.System, Content{Type: "text", Text: systemPrompt})
+	}
+	if hasMemory {
+		llm.MemoryBlock = memoryBlock
+		llm.System = append(llm.System, Content{Type: "text", Text: ""})
+		llm.Tools = append(llm.Tools,
+			// Core memory save Tool
+			Tool{
+				Name:        "coreMemorySave",
+				Description: "Save important information about you (the agent) or the human you are chatting with.",
+				InputSchema: InputSchema{
+					Type: "object",
+					Properties: map[string]Property{
+						"agentMem": {
+							Type:        "boolean",
+							Description: "Must be either `true` to save information about yourself (the agent), or `false` to save information about the user.",
+						},
+						"memory": {
+							Type:        "string",
+							Description: "Memory to save in the section",
+						},
+					},
+					Required: []string{"agentMem", "memory"},
+				},
+				// Wrapper function
+				Function: memoryBlock.coreMemorySaveVariadic,
+				// Function: func(agentMema any, memorya any) any {
+				// 	//args := params.(map[string]any)
+				// 	agentMem := params["agentMem"].(bool)
+				// 	memory := params["memory"].(string)
+				// 	return memoryBlock.coreMemorySave(agentMem, memory)
+				// },
+			},
+		)
+		llm.System = append(llm.System, Content{Type: "text", Text: fmt.Sprintf("MEMORY:\n%+v", memoryBlock)}) // provide string representation of MemoryBlock struct
 	}
 
 	request := LLMRequest{
@@ -89,13 +133,6 @@ func main() {
 
 		MaxTokens: 1024,
 		Tools:     llm.Tools,
-	}
-
-	if hasSystemPrompt {
-		llm.System = append(llm.System, Content{Type: "text", Text: systemPrompt})
-	}
-	if hasMemory {
-		llm.System = append(llm.System, Content{Type: "text", Text: "MEMORY:\n" + memoryBlockString}) // provide string representation of MemoryBlock struct
 	}
 
 	response, statusCode, err := llm.call(request)

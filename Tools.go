@@ -23,7 +23,7 @@ type InputSchema struct {
 	Properties map[string]Property `json:"properties"` // properties (parameters) that this tool takes as input
 	/*
 		Names of properties that are mandatory input parameters.
-		This slice should contain keys from Properties that are mandatory for being called
+		In Go, all function parameters are required when calling a function. Therefore, this field should contain the names of every parameter in the function, i.e. every key from the Properties field.
 	*/
 	Required []string `json:"required"`
 }
@@ -84,6 +84,11 @@ type Tool struct {
 		Defines the function to be executed for the model's tool calls
 	*/
 	Function func(...any) any `json:"-"`
+	// Function1P func(any) any                     `json:"-"`
+	// Function2P func(any, any) any                `json:"-"`
+	// Function3P func(any, any, any) any           `json:"-"`
+	// Function4P func(any, any, any, any) any      `json:"-"`
+	// Function5P func(any, any, any, any, any) any `json:"-"`
 }
 
 // func (response LLMResponse) getToolOutput(request LLMRequest) any {
@@ -146,7 +151,26 @@ func getSingleToolOutput(content Content, llm LLM) (any, bool) {
 	for _, value := range funcParams {
 		values = append(values, value)
 	}
+
 	return tool.Function(values...), true
+
+	/*
+		Calling the function with the appropriate number of parameters
+	*/
+	// switch numParams {
+	// case 1:
+	// 	return tool.Function1P(values[0]), true
+	// case 2:
+	// 	return tool.Function2P(values[0], values[1]), true
+	// case 3:
+	// 	return tool.Function3P(values[0], values[1], values[2]), true
+	// case 4:
+	// 	return tool.Function4P(values[0], values[1], values[2], values[3]), true
+	// case 5:
+	// 	return tool.Function5P(values[0], values[1], values[2], values[3], values[4]), true
+	// default:
+	// 	return nil, false
+	// }
 }
 
 /*

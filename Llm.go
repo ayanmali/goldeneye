@@ -22,8 +22,11 @@ type LLM struct {
 	// - claude-3-opus-20240229 (claude-3-opus-latest)
 	// - claude-3-sonnet-20240229
 	// - claude-3-haiku-20240307
-	Model  string
-	ApiKey string
+	Model    string
+	ApiKey   string
+	System   []Content
+	Messages []Message
+	Tools    []Tool
 }
 
 /*
@@ -45,8 +48,9 @@ func (llm LLM) NewClient(model string, apiKey ...string) (*LLM, bool) {
 	}
 
 	return &LLM{
-		Model:  model,
-		ApiKey: apiKey[0],
+		Model:    model,
+		ApiKey:   apiKey[0],
+		Messages: make([]Message, 0),
 	}, true
 }
 
@@ -294,14 +298,14 @@ func (llm LLM) call(reqData LLMRequest) (*LLMResponse, int, error) {
 /*
 Takes the output from the LLM and adds it to the conversation history.
 */
-func (request *LLMRequest) addResponseToChatHistory(response LLMResponse) {
+func (llm *LLM) addResponseToChatHistory(response LLMResponse) {
 	// Updating the chat history with the last output from the LLM
 
 	// A message can contain multiple Content structs
 	messageToAppend := Message{Role: "assistant", Content: []Content{}}
 	messageToAppend.Content = append(messageToAppend.Content, response.Content...)
 
-	request.Messages = append(request.Messages, messageToAppend)
+	llm.Messages = append(llm.Messages, messageToAppend)
 }
 
 // func getWeather(args ...interface{}) interface{} {

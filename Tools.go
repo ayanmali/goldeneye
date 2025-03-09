@@ -121,14 +121,14 @@ type Tool struct {
 /*
 Gets the result (output) of a single function call as specified by the LLM
 */
-func getSingleToolOutput(content Content, request LLMRequest) (any, bool) {
+func getSingleToolOutput(content Content, llm LLM) (any, bool) {
 	if content.Type != "tool_use" {
 		return nil, false
 	}
 
 	// Getting the slice of Tools provided to the LLM in the initial request
-	tools := request.Tools
-	// Creating a map containing every tool's name for efficient lookup
+	tools := llm.Tools
+	// Creating a map containing every tool (function) and it's name for efficient lookup
 	toolMap := make(map[string]Tool)
 	for _, tool := range tools {
 		toolMap[tool.Name] = tool
@@ -152,26 +152,27 @@ func getSingleToolOutput(content Content, request LLMRequest) (any, bool) {
 /*
 Adds the result of executing a given tool to the LLM's context.
 */
-func (request *LLMRequest) addToolResultToChatHistory(content Content) {
+func (llm *LLM) addToolResultToChatHistory(content Content) {
 	messageToAppend := Message{Role: "user", Content: []Content{}}
 
 	// Retrieving the output from the function call
-	output, ok := getSingleToolOutput(content, *request) // perform type assertion
+	output, ok := getSingleToolOutput(content, *llm)
 	if !ok {
 		// Handle the case where the assertion fails
 		output = "Error: Unable to retrieve tool output"
 	}
-	strOutput := output.(string)
+	strOutput := output.(string) // perform type assertion
 
 	// Creating the message
 	messageToAppend.Content = append(messageToAppend.Content, Content{
 		Type:      "tool_result",
 		ToolUseID: content.ToolUseID,
+		Name:      content.Name,
 		Content:   strOutput,
 	})
 
 	// Adding the message to the request
-	request.Messages = append(request.Messages, messageToAppend)
+	llm.Messages = append(llm.Messages, messageToAppend)
 }
 
 /*

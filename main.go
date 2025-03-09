@@ -42,26 +42,23 @@ func getWeather(args ...any) any {
 }
 
 func main() {
+	hasSystemPrompt := false
+	hasMemory := true
+	systemPrompt := ""
+	memoryBlockString := ""
 
 	llm := LLM{
 		ApiKey: ANTHROPIC_API_KEY,
 		Model:  "claude-3-haiku-20240307",
-	}
-
-	request := LLMRequest{
-		Model: llm.Model,
 		// System: []Content{
 		// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
 		// },
-
 		Messages: []Message{
 			{Role: "user",
 				Content: []Content{
 					{Type: "text", Text: "What is the weather in New York City?"},
 				}},
 		},
-
-		MaxTokens: 1024,
 		Tools: []Tool{
 			{Name: "getWeather",
 				Description: "A function that returns the weather (in degrees Celsius) for a given location.",
@@ -81,9 +78,29 @@ func main() {
 		},
 	}
 
+	request := LLMRequest{
+		Model:  llm.Model,
+		System: llm.System,
+		// System: []Content{
+		// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
+		// },
+
+		Messages: llm.Messages,
+
+		MaxTokens: 1024,
+		Tools:     llm.Tools,
+	}
+
+	if hasSystemPrompt {
+		llm.System = append(llm.System, Content{Type: "text", Text: systemPrompt})
+	}
+	if hasMemory {
+		llm.System = append(llm.System, Content{Type: "text", Text: "MEMORY:\n" + memoryBlockString}) // provide string representation of MemoryBlock struct
+	}
+
 	response, statusCode, err := llm.call(request)
 
-	if statusCode < 200 || statusCode > 299 {
+	if statusCode < 200 || statusCode >= 300 {
 		fmt.Println("Error with HTTP request to LLM")
 		return
 	}
@@ -92,12 +109,12 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 	}
 
+	// LLM's initial output
 	fmt.Println(response.getOutput())
-
 	fmt.Println("---------")
 
 	// Adding LLM response to chat history
-	request.addResponseToChatHistory(*response)
+	llm.addResponseToChatHistory(*response)
 
 	// Checking each Content block returned in the response
 	for _, content := range response.Content {
@@ -106,14 +123,14 @@ func main() {
 			continue
 		}
 		// Adding tool call result to chat history
-		request.addToolResultToChatHistory(content)
+		llm.addToolResultToChatHistory(content)
 	}
 
-	fmt.Println(request.Messages)
+	fmt.Println(llm.Messages)
 
 	response1, statusCode1, err1 := llm.call(request)
 
-	if statusCode1 < 200 || statusCode > 299 {
+	if statusCode1 < 200 || statusCode >= 300 {
 		fmt.Println("Error with HTTP request to LLM")
 		return
 	}

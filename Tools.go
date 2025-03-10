@@ -91,9 +91,9 @@ type Tool struct {
 	// Function5P func(any, any, any, any, any) any `json:"-"`
 }
 
-// func (response LLMResponse) getToolOutput(request LLMRequest) any {
+// func (response AgentResponse) getToolOutput(request AgentRequest) any {
 // 	respContent := response.Content
-// 	// Getting the slice of Tools provided to the LLM in the initial request
+// 	// Getting the slice of Tools provided to the Agent in the initial request
 // 	tools := request.Tools
 
 // 	// Creating a map containing every tool's name for efficient lookup
@@ -124,14 +124,14 @@ type Tool struct {
 // }
 
 /*
-Gets the result (output) of a single function call as specified by the LLM
+Gets the result (output) of a single function call as specified by the Agent
 */
-func getSingleToolOutput(content Content, llm LLM) (any, bool) {
+func getSingleToolOutput(content Content, llm Agent) (any, bool) {
 	if content.Type != "tool_use" {
 		return nil, false
 	}
 
-	// Getting the slice of Tools provided to the LLM in the initial request
+	// Getting the slice of Tools provided to the Agent in the initial request
 	tools := llm.Tools
 	// Creating a map containing every tool (function) and it's name for efficient lookup
 	toolMap := make(map[string]Tool)
@@ -174,9 +174,9 @@ func getSingleToolOutput(content Content, llm LLM) (any, bool) {
 }
 
 /*
-Adds the result of executing a given tool to the LLM's context.
+Adds the result of executing a given tool to the Agent's context.
 */
-func (llm *LLM) addToolResultToChatHistory(content Content) {
+func (llm *Agent) addToolResultToChatHistory(content Content) {
 	messageToAppend := Message{Role: "user", Content: []Content{}}
 
 	// Retrieving the output from the function call
@@ -197,25 +197,4 @@ func (llm *LLM) addToolResultToChatHistory(content Content) {
 
 	// Adding the message to the request
 	llm.Messages = append(llm.Messages, messageToAppend)
-}
-
-/*
-Tool for searching the web and retrieving relevant search results
-*/
-type SearchTool struct {
-	apiKey      string // Brave API Key
-	name        string
-	description string
-}
-
-/*
-Tool for querying a PostgreSQL database
-*/
-type SQLTool struct {
-}
-
-/*
-Tool for executing Go code
-*/
-type CodeExecutorTool struct {
 }

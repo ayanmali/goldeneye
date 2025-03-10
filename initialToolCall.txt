@@ -21,12 +21,12 @@ Sample program to test tool use with Claude
 
 // func main() {
 
-// 	llm := LLM{
+// 	llm := Agent{
 // 		ApiKey: ANTHROPIC_API_KEY,
 // 		Model:  "claude-3-haiku-20240307",
 // 	}
 
-// 	request := LLMRequest{
+// 	request := AgentRequest{
 // 		Model: llm.Model,
 // 		System: []Content{
 // 			{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
@@ -60,7 +60,7 @@ Sample program to test tool use with Claude
 // 	response, statusCode, err := llm.call(request)
 
 // 	if statusCode < 200 || statusCode > 299 {
-// 		fmt.Println("Error with HTTP request to LLM")
+// 		fmt.Println("Error with HTTP request to Agent")
 // 		return
 // 	}
 

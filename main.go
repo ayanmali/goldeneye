@@ -180,9 +180,9 @@ func main() {
 	// 	Tools:     llm.Tools,
 	// }
 
-	request := *llm.NewAgentRequest(DEFAULT_MAX_TOKENS, 0)
+	request := *agent.NewAgentRequest(DEFAULT_MAX_TOKENS, 0)
 
-	response, statusCode, err := llm.call(request)
+	response, statusCode, err := agent.call(request)
 
 	if statusCode < 200 || statusCode >= 300 {
 		fmt.Println("Error with HTTP request to Agent")
@@ -198,7 +198,7 @@ func main() {
 	fmt.Println("---------")
 
 	// Adding Agent response to chat history
-	llm.addResponseToChatHistory(*response)
+	agent.addResponseToChatHistory(*response)
 
 	// Checking each Content block returned in the response
 	for _, content := range response.Content {
@@ -207,12 +207,12 @@ func main() {
 			continue
 		}
 		// Adding tool call result to chat history
-		llm.addToolResultToChatHistory(content)
+		agent.addToolResultToChatHistory(content)
 	}
 
-	fmt.Println(llm.ChatHistory)
+	fmt.Println(agent.ChatHistory)
 
-	response1, statusCode1, err1 := llm.call(request)
+	response1, statusCode1, err1 := agent.call(request)
 
 	if statusCode1 < 200 || statusCode >= 300 {
 		fmt.Println("Error with HTTP request to Agent")

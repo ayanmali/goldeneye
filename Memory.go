@@ -1,27 +1,28 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
 // TODO: ability to add custom memory blocks into core memory (aside from just human and agent) and corresponding tools for those memory blocks
 type MemoryBlock struct {
 	sectionName string
-	size        int           // number of characters allotted for a given block of memory
-	data        string        // the text data stored in the given block of memory
-	toString    func() string // converting the data in the memory block into a string that can be parsed by the Agent
+	//size        int           // number of characters allotted for a given block of memory
+	data string // the text data stored in the given block of memory
 }
 
 // TODO: replace w/ ElasticSearch?
 type CoreMemory struct {
-	UserMemory/*map[string]string*/ MemoryBlock
-	AgentMemory/*map[string]string*/ MemoryBlock
+	Blocks map[string]*MemoryBlock
+	// UserMemory/*map[string]string*/ MemoryBlock
+	// AgentMemory/*map[string]string*/ MemoryBlock
 }
 
-func NewCoreMemoryUnit() *CoreMemory {
-	coreMemory := CoreMemory{
-		UserMemory:  MemoryBlock{sectionName: "user", size: 2000, data: ""},
-		AgentMemory: MemoryBlock{sectionName: "agent", size: 2000, data: ""},
+func NewCoreMemoryUnit(persona string) *CoreMemory {
+	coreMemory := CoreMemory{Blocks: map[string]*MemoryBlock{
+		"User":  {sectionName: "user" /*size: 2000,*/, data: ""},
+		"Agent": {sectionName: "agent" /*size: 2000,*/, data: persona}},
 	}
 
 	// coreMemory.UserMemory.toString = func() string {
@@ -36,16 +37,28 @@ func NewCoreMemoryUnit() *CoreMemory {
 }
 
 /*
-Conversation history
+Conversation history -- stored out of context
 */
 type RecallMemory struct {
 }
 
 /*
 General purpose out of context information storage
-Retrieve via RAG (semantic search)
+Retrieve via RAG (semantic search/tf-idf)
 */
 type ArchivalMemory struct {
+}
+
+/*
+Converts the data stored across all of Core Memory into a string that can be used in the Agent's context window.
+*/
+func (coreMemory CoreMemory) toString() string {
+	var builder strings.Builder
+
+	for section, block := range coreMemory.Blocks {
+		builder.WriteString(fmt.Sprintf("%s:\n%s\n", section, block.data))
+	}
+	return builder.String()
 }
 
 // func (memoryBlock *MemoryBlock) coreMemorySave(agentMem bool, section string, memory string) (result struct {
@@ -75,12 +88,10 @@ func (llm *Agent) coreMemoryAppend(agentMem bool, newContent string, requestHear
 	llm.HeartbeatState = requestHeartbeat
 
 	if agentMem {
-		llm.CoreMemory.AgentMemory.data += "\n"
-		llm.CoreMemory.AgentMemory.data += newContent
+		llm.CoreMemory.Blocks["Agent"].data += fmt.Sprintf("\n%s", newContent)
 		return llm.CoreMemory
 	}
-	llm.CoreMemory.UserMemory.data += "\n"
-	llm.CoreMemory.UserMemory.data += newContent
+	llm.CoreMemory.Blocks["User"].data += fmt.Sprintf("\n%s", newContent)
 	return llm.CoreMemory
 }
 
@@ -113,14 +124,47 @@ func (llm *Agent) coreMemoryAppendVariadic(args ...any) any {
 	return llm.coreMemoryAppend(agentMem, newContent, requestHeartbeat)
 }
 
+func (llm Agent) createCoreMemoryAppendTool() *Tool {
+	return &Tool{
+		Name:        "coreMemoryAppend",
+		Description: "Save important information about you (the agent) or the human you are chatting with.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"agentMem": {
+					Type:        "boolean",
+					Description: "Must be either `true` to save information about yourself (the agent), or `false` to save information about the user.",
+				},
+				"newContent": {
+					Type:        "string",
+					Description: "CoreMemory to save in the section",
+				},
+				"requestHeartbeat": {
+					Type:        "boolean",
+					Description: "Set to `true` to continue your execution (i.e. you will be invoked again) and run an additional step afterward, or `false` to end your execution now.",
+				},
+			},
+			Required: []string{"agentMem", "newMemory"},
+		},
+		// Wrapper function
+		Function: llm.coreMemoryAppendVariadic,
+		// Function: func(agentMema any, memorya any) any {
+		// 	//args := params.(map[string]any)
+		// 	agentMem := params["agentMem"].(bool)
+		// 	memory := params["memory"].(string)
+		// 	return memoryBlock.coreMemorySave(agentMem, memory)
+		// },
+	}
+}
+
 func (llm *Agent) coreMemoryReplace(agentMem bool, oldContent string, newContent string, requestHeartbeat bool) CoreMemory {
 	llm.HeartbeatState = requestHeartbeat
 
 	if agentMem {
-		llm.CoreMemory.AgentMemory.data = strings.ReplaceAll(llm.CoreMemory.AgentMemory.data, oldContent, newContent)
+		llm.CoreMemory.Blocks["Agent"].data = strings.ReplaceAll(llm.CoreMemory.Blocks["Agent"].data, oldContent, newContent)
 		return llm.CoreMemory
 	}
-	llm.CoreMemory.UserMemory.data = strings.ReplaceAll(llm.CoreMemory.UserMemory.data, oldContent, newContent)
+	llm.CoreMemory.Blocks["User"].data = strings.ReplaceAll(llm.CoreMemory.Blocks["User"].data, oldContent, newContent)
 	return llm.CoreMemory
 }
 
@@ -148,13 +192,13 @@ func (llm *Agent) pauseHeartbeats() {
 
 /* Functions to clear space in the context window */
 
-func (llm Agent) recursiveSummarization() {
+// func (llm Agent) recursiveSummarization() {
 
-}
+// }
 
-func (llm *Agent) flushMemory() {
+// func (llm *Agent) flushMemory() {
 
-}
+// }
 
 // func (llm *Agent) addMemoryUpdateToChatHistory(content Content, memoryBlock MemoryBlock) {
 // 	llm.Messages = append(llm.Messages,

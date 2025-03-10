@@ -61,94 +61,126 @@ func getWeatherVariadic(args ...any) any {
 }
 
 func main() {
-	hasSystemPrompt := false
-	hasMemory := true
+	// hasSystemPrompt := false
+	// hasMemory := true
 
-	// Replace w actual values
-	systemPrompt := ""
-	memory := CoreMemory{}
+	// // Replace w actual values
+	// systemPrompt := ""
+	// memory := CoreMemory{}
+	const DEFAULT_MAX_TOKENS int = 2048
 
-	llm := Agent{
-		ApiKey: ANTHROPIC_API_KEY,
-		Model:  "claude-3-haiku-20240307",
-		// System: []Content{
-		// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
-		// },
-		Messages: []Message{
-			{Role: "user",
-				Content: []Content{
-					{Type: "text", Text: "What is the weather in New York City?"},
-				}},
-		},
-		Tools: []Tool{
-			{Name: "getWeather",
-				Description: "A function that returns the weather (in degrees Celsius) for a given location.",
-				InputSchema: InputSchema{
-					Type: "object",
-					Properties: map[string]Property{
-						"location": {Type: "string", Description: `The geographic location to check the weather for. 
-																	The format should be the name of the city followed by the abbreviated name of the state that the city belongs to.
-																	In other words, the format should be "<CITY_NAME>, <STATE>".
-																	For example, to check the weather in Boston, Massachussetts, this parameter would be "Boston, MA".`,
-						},
-					},
-					Required: []string{"location"},
+	agent, ok := NewAgent("claude-3-haiku-20240307", "Assistant", "firstAgent", ANTHROPIC_API_KEY)
+	if !ok {
+		fmt.Println("Error when initializing agent")
+		return
+	}
+
+	// todo: add a helper method for this
+	agent.Tools = append(agent.Tools, Tool{Name: "getWeather",
+		Description: "A function that returns the weather (in degrees Celsius) for a given location.",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]Property{
+				"location": {Type: "string", Description: `The geographic location to check the weather for. 
+														The format should be the name of the city followed by the abbreviated name of the state that the city belongs to.
+														In other words, the format should be "<CITY_NAME>, <STATE>".
+														For example, to check the weather in Boston, Massachussetts, this parameter would be "Boston, MA".`,
 				},
-				Function: getWeatherVariadic,
 			},
+			Required: []string{"location"},
 		},
-	}
+		Function: getWeatherVariadic,
+	})
 
-	if hasSystemPrompt {
-		llm.System = append(llm.System, Content{Type: "text", Text: systemPrompt})
-	}
-	if hasMemory {
-		llm.CoreMemory = memory
-		llm.System = append(llm.System, Content{Type: "text", Text: "You are a helpful AI agent with access to a core memory. You can add new information to your core memory by calling the `coreMemorySave` function."})
-		llm.Tools = append(llm.Tools,
-			// Core memory save Tool
-			Tool{
-				Name:        "coreMemoryAppend",
-				Description: "Save important information about you (the agent) or the human you are chatting with.",
-				InputSchema: InputSchema{
-					Type: "object",
-					Properties: map[string]Property{
-						"agentMem": {
-							Type:        "boolean",
-							Description: "Must be either `true` to save information about yourself (the agent), or `false` to save information about the user.",
-						},
-						"newMemory": {
-							Type:        "string",
-							Description: "CoreMemory to save in the section",
-						},
-					},
-					Required: []string{"agentMem", "newMemory"},
-				},
-				// Wrapper function
-				Function: llm.coreMemoryAppendVariadic,
-				// Function: func(agentMema any, memorya any) any {
-				// 	//args := params.(map[string]any)
-				// 	agentMem := params["agentMem"].(bool)
-				// 	memory := params["memory"].(string)
-				// 	return memoryBlock.coreMemorySave(agentMem, memory)
-				// },
-			},
-		)
-		llm.System = append(llm.System, Content{Type: "text", Text: fmt.Sprintf("MEMORY:\n%+v", memory)}) // provide string representation of MemoryBlock struct
-	}
+	// todo: add a helper method for this
+	agent.ChatHistory = append(agent.ChatHistory, Message{Role: "user",
+		Content: []Content{
+			{Type: "text", Text: "What is the weather in New York City?"},
+		}})
 
-	request := AgentRequest{
-		Model:  llm.Model,
-		System: llm.System,
-		// System: []Content{
-		// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
-		// },
+	// llm := Agent{
+	// 	ApiKey: ANTHROPIC_API_KEY,
+	// 	Model:  "claude-3-haiku-20240307",
+	// 	// System: []Content{
+	// 	// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
+	// 	// },
+	// 	ChatHistory: []Message{
+	// 		{Role: "user",
+	// 			Content: []Content{
+	// 				{Type: "text", Text: "What is the weather in New York City?"},
+	// 			}},
+	// 	},
+	// 	Tools: []Tool{
+	// 		{Name: "getWeather",
+	// 			Description: "A function that returns the weather (in degrees Celsius) for a given location.",
+	// 			InputSchema: InputSchema{
+	// 				Type: "object",
+	// 				Properties: map[string]Property{
+	// 					"location": {Type: "string", Description: `The geographic location to check the weather for.
+	// 																The format should be the name of the city followed by the abbreviated name of the state that the city belongs to.
+	// 																In other words, the format should be "<CITY_NAME>, <STATE>".
+	// 																For example, to check the weather in Boston, Massachussetts, this parameter would be "Boston, MA".`,
+	// 					},
+	// 				},
+	// 				Required: []string{"location"},
+	// 			},
+	// 			Function: getWeatherVariadic,
+	// 		},
+	// 	},
+	// }
 
-		Messages: llm.Messages,
+	// if hasSystemPrompt {
+	// 	llm.System = append(llm.System, Content{Type: "text", Text: systemPrompt})
+	// }
+	// if hasMemory {
+	//llm.CoreMemory = memory
+	//llm.System = append(llm.System, Content{Type: "text", Text: "You are a helpful AI agent with access to a core memory. You can add new information to your core memory by calling the `coreMemorySave` function."})
+	// llm.Tools = append(llm.Tools,
+	// 	// Core memory save Tool
+	// 	Tool{
+	// 		Name:        "coreMemoryAppend",
+	// 		Description: "Save important information about you (the agent) or the human you are chatting with.",
+	// 		InputSchema: InputSchema{
+	// 			Type: "object",
+	// 			Properties: map[string]Property{
+	// 				"agentMem": {
+	// 					Type:        "boolean",
+	// 					Description: "Must be either `true` to save information about yourself (the agent), or `false` to save information about the user.",
+	// 				},
+	// 				"newMemory": {
+	// 					Type:        "string",
+	// 					Description: "CoreMemory to save in the section",
+	// 				},
+	// 			},
+	// 			Required: []string{"agentMem", "newMemory"},
+	// 		},
+	// 		// Wrapper function
+	// 		Function: llm.coreMemoryAppendVariadic,
+	// 		// Function: func(agentMema any, memorya any) any {
+	// 		// 	//args := params.(map[string]any)
+	// 		// 	agentMem := params["agentMem"].(bool)
+	// 		// 	memory := params["memory"].(string)
+	// 		// 	return memoryBlock.coreMemorySave(agentMem, memory)
+	// 		// },
+	// 	},
+	// )
+	// llm.System = append(llm.System, Content{Type: "text", Text: fmt.Sprintf("MEMORY:\n%+v", memory)}) // provide string representation of MemoryBlock struct
+	// }
 
-		MaxTokens: 1024,
-		Tools:     llm.Tools,
-	}
+	// request := AgentRequest{
+	// 	Model:  llm.Model,
+	// 	System: llm.System,
+	// 	// System: []Content{
+	// 	// 	{Type: "text", Text: "You are a helpful AI assistant designed to answer user questions."},
+	// 	// },
+
+	// 	Messages: llm.ChatHistory,
+
+	// 	MaxTokens: 1024,
+	// 	Tools:     llm.Tools,
+	// }
+
+	request := *llm.NewAgentRequest(DEFAULT_MAX_TOKENS, 0)
 
 	response, statusCode, err := llm.call(request)
 
@@ -178,7 +210,7 @@ func main() {
 		llm.addToolResultToChatHistory(content)
 	}
 
-	fmt.Println(llm.Messages)
+	fmt.Println(llm.ChatHistory)
 
 	response1, statusCode1, err1 := llm.call(request)
 

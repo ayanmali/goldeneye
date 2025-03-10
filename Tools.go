@@ -196,5 +196,5 @@ func (llm *Agent) addToolResultToChatHistory(content Content) {
 	})
 
 	// Adding the message to the request
-	llm.Messages = append(llm.Messages, messageToAppend)
+	llm.ChatHistory = append(llm.ChatHistory, messageToAppend)
 }

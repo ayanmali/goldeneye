@@ -26,7 +26,7 @@ type Agent struct {
 	Name           string
 	ApiKey         string
 	System         []Content
-	Messages       []Message
+	ChatHistory    []Message
 	Tools          []Tool
 	CoreMemory     CoreMemory
 	HeartbeatState bool
@@ -38,7 +38,7 @@ The apiKey argument is optional; omitting it will attempt to obtain the ANTHROPI
 Note that if the ANTHROPIC_API_KEY environment variable is not set, the function will return `false` as its second return value.
 If the apiKey argument is included, the Agent will use the provided API key for making requests to the API.
 */
-func (llm Agent) NewAgent(model string, persona string, name string, apiKey ...string) (*Agent, bool) {
+func NewAgent(model string, persona string, name string, apiKey ...string) (*Agent, bool) {
 	var key string
 
 	if len(apiKey) == 0 {
@@ -51,18 +51,20 @@ func (llm Agent) NewAgent(model string, persona string, name string, apiKey ...s
 		key = apiKey[0]
 	}
 
-	return &Agent{
-		Model:  model,
-		ApiKey: key,
-		Name:   name,
-		System: []Content{Content{Type: "text", Text: fmt.Sprintf(`
-		%s\n
-		<persona>\n%s\n</persona>
-		`, SYSTEM_PROMPT, persona)}},
-		Messages:       make([]Message, 0),
-		CoreMemory:     *NewCoreMemoryUnit(),
+	agent := &Agent{
+		Model:          model,
+		ApiKey:         key,
+		Name:           name,
+		System:         []Content{{Type: "text", Text: SYSTEM_PROMPT}},
+		ChatHistory:    make([]Message, 0),
+		CoreMemory:     *NewCoreMemoryUnit(persona),
 		HeartbeatState: false,
-	}, true
+	}
+
+	agent.System = append(agent.System, Content{Type: "text", Text: agent.CoreMemory.toString()})
+	agent.Tools = append(agent.Tools, *agent.createCoreMemoryAppendTool())
+
+	return agent, true
 }
 
 type AgentRequest struct {
@@ -202,13 +204,13 @@ func (response AgentResponse) getOutput() string {
 /*
 Create a request for the Agent (custom messages parameter)
 */
-func (llm Agent) NewAgentRequest(tools []Tool, maxTokens int, system []Content, temperature float32, messages []Message) *AgentRequest {
+func (llm Agent) NewAgentRequest(maxTokens int, temperature float32) *AgentRequest {
 	return &AgentRequest{
 		Model:       llm.Model,
 		MaxTokens:   maxTokens,
-		Tools:       tools,
-		Messages:    messages,
-		System:      system,
+		Tools:       llm.Tools,
+		System:      llm.System,
+		Messages:    llm.ChatHistory,
 		Temperature: temperature,
 	}
 }
@@ -308,14 +310,14 @@ func (llm Agent) call(reqData AgentRequest) (*AgentResponse, int, error) {
 
 	fmt.Println("Storing response")
 	// Storing the response into the Response struct
-	var apiRes AgentResponse
-	err = json.Unmarshal(resBody, &apiRes)
+	var apiResp AgentResponse
+	err = json.Unmarshal(resBody, &apiResp)
 	if err != nil {
 		fmt.Printf("Error parsing the response: %v\n", err)
 		return nil, res.StatusCode, err
 	}
 
-	return &apiRes, res.StatusCode, nil
+	return &apiResp, res.StatusCode, nil
 
 }
 
@@ -329,7 +331,7 @@ func (llm *Agent) addResponseToChatHistory(response AgentResponse) {
 	messageToAppend := Message{Role: "assistant", Content: []Content{}}
 	messageToAppend.Content = append(messageToAppend.Content, response.Content...)
 
-	llm.Messages = append(llm.Messages, messageToAppend)
+	llm.ChatHistory = append(llm.ChatHistory, messageToAppend)
 }
 
 // func getWeather(args ...interface{}) interface{} {

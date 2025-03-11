@@ -2,6 +2,8 @@
 Go implementation of Claude logic from Anthropic API
 */
 
+//TODO: ability to expose agents via  REST API to create agents as a service
+
 package main
 
 import (
@@ -61,8 +63,10 @@ func NewAgent(model string, persona string, name string, apiKey ...string) (*Age
 		HeartbeatState: false,
 	}
 
+	// providing the Agent system prompt as well as core memory data
 	agent.System = append(agent.System, Content{Type: "text", Text: agent.CoreMemory.toString()})
-	agent.Tools = append(agent.Tools, *agent.createCoreMemoryAppendTool())
+	// providing necessary tools for memory management
+	agent.Tools = append(agent.Tools, *agent.createCoreMemoryAppendTool(), *agent.createCoreMemoryReplaceTool())
 
 	return agent, true
 }
